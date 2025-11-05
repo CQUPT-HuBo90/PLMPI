@@ -26,8 +26,10 @@ https://github.com/CQUPT-HuBo90/PLMPI/releases/download/SSL_based_model-50/SSL_b
 ## Usage
 train and test DCPI-DQA
 ```markdown
+```bash
 python train_test.py
 
 Follow the given prompts to select the parameters you need. For example:
 ```markdown
+```bash
 python train_test.py --dataset LIVEC --patch_num 50 --batch_size 64 --lr 2e-5 --epochs 6
