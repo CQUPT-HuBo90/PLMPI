@@ -21,3 +21,14 @@ Install Requirements
 ## Pretrain model weight
 https://github.com/CQUPT-HuBo90/PLMPI/releases/download/mamba_model/vim_t_midclstok_ft_78p3acc.pth
 https://github.com/CQUPT-HuBo90/PLMPI/releases/download/dpt_levit_224/dpt_levit_224.pt
+https://github.com/CQUPT-HuBo90/PLMPI/releases/download/SSL_based_model-50/SSL_based_model-50.pth
+
+## Usage
+train and test DCPI-DQA
+```markdown
+```bash
+python train_test.py
+
+Follow the given prompts to select the parameters you need. For example:
+
+python train_and_test.py --dataset DHQ --patch_num 25 --batch_size 64 --lr 2e-5 --epochs 6
