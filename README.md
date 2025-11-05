@@ -19,3 +19,4 @@ Install Requirements
 </div>
 
 ## Pretrain model weight
+https://github.com/CQUPT-HuBo90/PLMPI/releases/download/mamba_model/vim_t_midclstok_ft_78p3acc.pth
