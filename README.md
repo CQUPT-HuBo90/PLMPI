@@ -4,14 +4,14 @@ Source codes for paper “HVS-inspired Blind Image Quality Index with Prominent 
 ## Installation
 Install Requirements
 <div style="background-color: #f5f5f5; padding: 10px; border-radius: 4px;">
-argparse
-random
-numpy
-scipy
-torch
-torchvision
-timm
-mamba-ssm
-causal-conv1d 
+- argparse
+- random
+- numpy
+- scipy
+- torch
+- torchvision
+- timm
+- mamba-ssm
+- causal-conv1d 
 </div>
 ## Pretrain model weight
