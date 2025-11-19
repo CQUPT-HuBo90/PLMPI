@@ -1,6 +1,6 @@
-## PLMPI
 Source codes for paper “HVS-inspired Blind Image Quality Index with Prominent Perception Learning and Multi-level Progressive Integration”
-<img width="1376" height="776" alt="QQ_1762321044055" src="https://github.com/user-attachments/assets/f37026e1-e777-4dfd-a91f-3962e5bce381" />
+<img width="1372" height="774" alt="369c9805-e62b-4e79-a8da-2d18af148275" src="https://github.com/user-attachments/assets/f0275315-cbd8-4049-a0cf-95196e956525" />
+
 ## Installation
 Install Requirements
 <div style="background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 6px; border-left: 3px solid #ddd;">
@@ -24,7 +24,7 @@ https://github.com/CQUPT-HuBo90/PLMPI/releases/download/dpt_levit_224/dpt_levit_
 https://github.com/CQUPT-HuBo90/PLMPI/releases/download/SSL_based_model-50/SSL_based_model-50.pth
 
 ## Usage
-train and test DCPI-DQA
+train and test PLMPI
 ```bash
 python train_test.py
 ```
