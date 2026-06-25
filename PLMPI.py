@@ -17,37 +17,60 @@ torch.backends.cudnn.deterministic = False
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 class Attention_Cross(nn.Module):
-    def __init__(self, dim, heads = 8, dim_head = 64, dropout = 0.):
+    def __init__(self, dim, heads=8, dim_head=64, dropout=0.):
         super().__init__()
-        inner_dim = dim_head *  heads
+        inner_dim = dim_head * heads
         project_out = not (heads == 1 and dim_head == dim)
 
         self.heads = heads
         self.dim_head = dim_head
         self.scale = dim_head ** -0.5
 
-        self.attend = nn.Softmax(dim = -1)
+        self.attend = nn.Softmax(dim=-1)
         self.dropout = nn.Dropout(dropout)
 
-        self.to_kv = nn.Linear(dim, inner_dim * 2, bias = False)
+        self.to_q = nn.Linear(dim, inner_dim, bias=False)
+        self.to_kv = nn.Linear(dim, inner_dim * 2, bias=False)
 
         self.to_out = nn.Sequential(
             nn.Linear(inner_dim, dim),
             nn.Dropout(dropout)
         ) if project_out else nn.Identity()
 
-    def forward(self, x, q):
-        B, N, C = x.shape
-        kv = self.to_kv(x).reshape(B, N, 2, self.heads, self.dim_head).permute(2, 0, 3, 1, 4)
+    def forward(self, kv_input, q_input):
+        """
+        kv_input: ResNet local features, [B, Nk, C]
+        q_input:  Mamba/Vim global features, [B, Nq, C]
+
+        Output:   [B, Nq, C]
+        """
+        B, Nk, C = kv_input.shape
+        Bq, Nq, Cq = q_input.shape
+
+        assert B == Bq, "kv_input and q_input must have the same batch size"
+        assert C == Cq, "kv_input and q_input must have the same channel dim"
+
+        q = self.to_q(q_input)
+        q = q.reshape(B, Nq, self.heads, self.dim_head)
+        q = q.permute(0, 2, 1, 3)  # [B, heads, Nq, dim_head]
+
+        kv = self.to_kv(kv_input)
+        kv = kv.reshape(B, Nk, 2, self.heads, self.dim_head)
+        kv = kv.permute(2, 0, 3, 1, 4)  # [2, B, heads, Nk, dim_head]
         k, v = kv[0], kv[1]
-        q = q.reshape(B, N, self.heads, self.dim_head).permute(0, 2, 1, 3)
-        
+
         dots = torch.matmul(q, k.transpose(-1, -2)) * self.scale
+        # dots: [B, heads, Nq, Nk]
+
         attn = self.attend(dots)
         attn = self.dropout(attn)
 
         out = torch.matmul(attn, v)
-        out = out.permute(0, 2, 1, 3).reshape(B, N, C)
+        # out: [B, heads, Nq, dim_head]
+
+        out = out.permute(0, 2, 1, 3).reshape(B, Nq, -1)
+        # out: [B, Nq, inner_dim]
+
         return self.to_out(out)
 
 
@@ -163,19 +186,26 @@ class NATCrossLayer(nn.Module):
             self.gamma2 = nn.Parameter(layer_scale * torch.ones(dim), requires_grad=True)
 
     def forward(self, x, q_extra):
+        """
+        x:       ResNet local features, [B, Nk, C]
+        q_extra: Mamba/Vim global features, [B, Nq, C]
+
+        return:  updated global features, [B, Nq, C]
+        """
+        shortcut = q_extra
+
+        kv = self.norm1(x)
+        q = q_extra
+
+        x_cross = self.attn(kv, q)
         if not self.layer_scale:
-            shortcut = x
-            x = self.norm1(x)
-            x = self.attn(x, q_extra)
-            x = shortcut + self.drop_path(x)
-            x = x + self.drop_path(self.mlp(self.norm2(x)))
-            return x
-        shortcut = x
-        x = self.norm1(x)
-        x = self.attn(x, q_extra)
-        x = shortcut + self.drop_path(self.gamma1 * x)
-        x = x + self.drop_path(self.gamma2 * self.mlp(self.norm2(x)))
-        return x
+            q_extra = shortcut + self.drop_path(x_cross)
+            q_extra = q_extra + self.drop_path(self.mlp(self.norm2(q_extra)))
+            return q_extra
+        q_extra = shortcut + self.drop_path(x_cross)
+
+        q_extra = q_extra + self.drop_path(self.mlp(self.norm2(q_extra)))
+        return q_extra
 
 
 class SequenceAligner(nn.Module):
@@ -245,7 +275,7 @@ class NATInjectModule(nn.Module):
         self.nat_block = NATBlock(
             dim=hid_dim,
             depth=4,          
-            depth_cross=2,    
+            depth_cross=4,    
             num_heads=8,       
             mlp_ratio=4.,
             drop=0.1,
@@ -258,7 +288,7 @@ class NATInjectModule(nn.Module):
 
     def forward(self, x, cnn_feat):
         
-        cnn_feat_aligned = self.aligner(cnn_feat)
+        cnn_feat_aligned = cnn_feat
         
         x_proj = self.proj_mamba(x)
         
@@ -319,7 +349,7 @@ class model(nn.Module):
         self.blocks = nn.ModuleList([
                                  Block(dim=192, mixer_cls=partial(Mamba, d_state=28, layer_idx=None, bimamba_type="v2",
                                  if_divide_out=False, init_layer_scale=None), norm_cls=nn.LayerNorm) for _ in range(3)]).to(device)
-        self.load_pretrained_with_fourier_interpolation("/home/cty/science/my_loda/vim_t_midclstok_ft_78p3acc.pth")
+        self.load_pretrained_with_fourier_interpolation("/data/user/lnx/dicussion/vim_t_midclstok_ft_78p3acc.pth")
         
         # patch embeding
         self.patch_embed = PatchEmbed(img_size=224, patch_size=16, embed_dim=512).to(device)
@@ -405,7 +435,7 @@ class model(nn.Module):
             depth_maps = self.depth_generator(x)
             depth_maps = depth_maps.repeat(1, 3, 1, 1).to(dtype=dtype)
             
-            with torch.cuda.amp.autocast(enabled=device.type == 'cuda'):
+            with torch.amp.autocast(device_type=device.type, enabled=device.type == 'cuda'):
                 saliency = self.saliency_model(x.to(dtype), depth_maps)
                 saliency = saliency[0] if isinstance(saliency, tuple) else saliency
             
